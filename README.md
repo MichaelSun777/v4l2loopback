@@ -373,3 +373,247 @@ http://github.com/umlaeute/v4l2loopback/.
 
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+v4l2loopback - 创建 V4L2 环回设备的内核模块
+该模块允许您创建“虚拟视频设备”。普通 (v4l2) 应用程序将读取这些设备，就好像它们是普通视频设备一样，但视频不会从例如采集卡读取，而是由另一个应用程序生成。例如，这允许你在你的 Skype 视频上应用一些漂亮的视频效果......它还允许一些更严重的事情（例如，我一直在使用它通过将 GStreamer 挂接到环回设备来为应用程序添加流媒体功能）。
+
+消息
+要获取每个新版本的主要功能，请参阅 NEWS 文件。您还可以查看 ChangeLog（它会自动生成并且可能只有有限的用途......
+
+问题
+对于当前问题， 请查看https://github.com/umlaeute/v4l2loopback/issues请使用问题跟踪器报告任何问题。
+
+在我们的问题跟踪器中创建新票证之前，请确保您已阅读 本文档并遵循其中的任何说明。
+
+此外，请在报告任何问题之前搜索问题跟踪器：将您的信息添加到现有票证比创建具有基本相同信息的新票证要好得多。
+
+寻求帮助
+问题跟踪器旨在跟踪代码中的特定错误（和新功能）。但是，它不适合作为用户支持论坛。
+
+如果您有一般问题或问题，请改用Unix 和 Linuxv4l2loopback上的标签：https : //unix.stackexchange.com/questions/tagged/v4l2loopback
+
+依赖
+为了构建（编译，...）任何东西，你必须有一个工作构建环境（编译器，GNU时许，...）。如果您尝试加载使用与编译内核本身不同的编译器编译的模块，则内核可能会有些挑剔。因此，请确保安装了正确的编译器。
+
+v4l2loopback 模块是一个内核模块。为了构建它，您必须安装与要使用该模块的 linux 内核相匹配的内核头文件（在大多数情况下，这将是您当前正在运行的内核）。请注意，内核头文件和内核映像必须具有完全相同的版本。例如，3.18.0-trunk-rpi是与 不同的版本3.18.7-v7+，即使前几个数字相同。（如果版本不匹配，模块将不兼容。如果你幸运，模块会拒绝加载。如果你不走运，你的电脑会吐在你的眼睛上或更糟。）
+
+在如何获取正确的内核头文件（或安装编译工具链）方面存在特定于发行版的差异。记录所有这些可能性将远远超出v4l2loopback. 请理解，我们无法为有关依赖项的问题提供支持。
+
+建造
+要构建内核模块，请运行：
+
+$ make
+这应该会给你一个名为“v4l2loopback.ko”的文件，它是内核模块
+
+重新建造
+您不能将为内核的特定版本构建的模块加载到内核的另一个版本中。因此，如果您之前已经成功构建了模块并更新了内核（以及匹配的头文件），那么在此期间，您确实必须在重新编译模块之前清理构建。所以在再次开始构建之前运行它：
+
+$ make clean
+安装
+要安装模块，请运行“make install”（您可能必须是“root”才能拥有安装模块所需的所有权限）。
+
+如果您的系统有“sudo”，请执行以下操作：
+
+$ make && sudo make install
+$ sudo depmod -a
+如果您的系统缺少“sudo”，请执行以下操作：
+
+$ make
+$ su
+(enter root password)
+# make install
+# depmod -a
+# exit
+（该depmod -a调用将重新计算模块依赖关系，以便自动加载 v4l2loopback 所需的其他内核模块。现代系统上可能不需要该调用。）
+
+有关特定于发行版的构建说明 或使用DKMS.
+
+跑步
+以 root 身份加载 v4l2loopback 模块：
+
+# modprobe v4l2loopback
+使用sudo用途：
+
+$ sudo modprobe v4l2loopback
+这将创建一个额外的视频设备，例如 /dev/video0（数量取决于您的系统上是否已经有视频设备），它可以由各种程序提供。测试过的馈线：
+
+GStreamer-1.0：使用“v4l2sink”元素
+Gem(>=0.93) 使用“recordV4L2”插件
+理论上，大多数能够写入v4l2 设备的程序应该可以工作。
+
+发送到 v4l2loopback 设备的数据可以被任何支持 v4l2 的应用程序读取。
+
+您可以在http://github.com/umlaeute/v4l2loopback/wiki的 wiki 上找到许多场景
+
+故障排除
+如果您有启用安全启动的内核，您可能无法简单地构建内核模块并插入它。（在构建模块时，您将收到SSL 错误。）这实际上是一项安全功能（因为它可以防止恶意代码插入内核空间）。
+
+如果您不被允许插入内核模块（运行modprobe, 或insmod），您有几个选择（请参阅您的发行版文档以了解如何执行任何这些步骤）：
+
+禁用安全启动并重新启动
+使用列入白名单的密钥对模块二进制文件进行签名（这可能仅适用于创建发行版的情况）
+您也可以尝试通过DKMS构建模块，并希望它为您带来所有魔力。
+
+选项
+如果需要多个独立的环回设备，可以在加载模块时传入“devices”选项；例如
+
+# modprobe v4l2loopback devices=4
+将为您提供 4 个环回设备（例如/dev/video1... /dev/video5）
+
+您也可以手动指定设备 ID；例如
+
+# modprobe v4l2loopback video_nr=3,4,7
+将创建 3 个设备 ( /dev/video3, /dev/video4& /dev/video7)
+
+# modprobe v4l2loopback video_nr=3,4,7 card_label="device number 3","the number four","the last one"
+将创建 3 个设备，卡名作为第二个参数传递：
+
+/dev/video3->设备号 3
+/dev/video4->数字四
+/dev/video7->最后一个
+如果您在使用 Chrome/WebRTC 检测设备时遇到问题，您可以尝试“exclusive_caps”模式：
+
+# modprobe v4l2loopback exclusive_caps=1
+这将启用仅报告 CAPTURE/OUTPUT 功能的“exclusive_caps”模式。新创建的设备将仅宣布 OUTPUT 功能（因此普通网络摄像头应用程序（包括 Chrome）不会看到它）。一旦您将生产者附加到设备，它就会开始仅宣布 CAPTURE 功能（因此拒绝打开具有除捕获之外的其他功能的设备的应用程序也可以打开它。）
+
+改变选项
+您在加载模块时提供的选项（例如 via modprobe）无法轻松即时更改。为了更改这些选项，您必须首先卸载模块rmmod （只有在没有应用程序不再访问其中一个环回设备时才会工作），然后再次加载它（使用新选项）。
+
+另请参阅有关动态设备管理的部分。
+
+属性
+您可以通过 sysfs 以人类可读的格式设置和/或查询某些设备属性。看/sys/devices/virtual/video4linux/video*/
+
+还有一些 V4L2 控件可以列出
+
+$ v4l2-ctl -d /dev/video0 -l
+keep_format(0/1): 设置为 1 时，一旦协商格式将永远固定，直到设置重新设置为 0
+sustain_framerate(0/1): 如果设置为 1，将在需要时通过帧复制来确保标称设备 fps
+timeout(integer): 如果 >0，将导致在丢失输入的 (value) 毫秒后显示超时图片（默认情况下为空帧）
+timeout_image_io(0/1): 如果设置为 1，下一个 opener 将写入超时帧缓冲区
+改变运行时行为
+强制 FPS
+$ v4l2loopback-ctl set-fps /dev/video0 25
+或者
+
+$ echo '@100' | sudo tee /sys/devices/virtual/video4linux/video0/format
+强制格式
+$ v4l2loopback-ctl set-caps /dev/video0 "UYVY:640x480"
+请注意GStreamer 样式的大写字母（例如video/x-raw,format=UYVY,width=640,height=480）或不再支持！
+
+设置流超时
+您可以定义超时（以毫秒为单位），在此之后，如果生产者突然停止，环回设备将开始输出 NULL 帧。
+
+$ v4l2-ctl -d /dev/video0 -c timeout=3000
+或者，您也可以提供一个超时图像，如果生产者在给定时间段内没有发送任何新帧，它将被显示（而不是空帧）：
+
+$ v4l2loopback-ctl set-timeout-image -t 3000 /dev/video0 service-unavailable.png
+(this currently requires GStreamer 1.0 installed)
+动态设备管理
+您可以使用该实用程序的add（相应delete）命令即时创建（和删除）环回设备v4l2loopback-ctl。
+
+创建新设备时，模块选项可能会被忽略。因此，您必须明确指定它们。
+
+要创建一个/dev/video7带有“loopy doopy”标签的新设备，请使用：
+
+$ sudo v4l2loopback-ctl add -n "loopy doopy" /dev/video7
+删除设备非常简单：
+
+$ sudo v4l2loopback-ctl delete /dev/video7
+内核
+原始模块已经为linux-2.6.28开发；我的系统已经没有这么老的内核了，不知道还能不能用。进一步的开发主要在 linux-2.6.32 和 linux-2.6.35 上完成，新的内核在进入 Debian 时会不断地进行测试。
+
+支持：
+
+=5.0.0 应该工作
+
+=4.0.0 应该工作
+
+=3.0.0 可能有用
+
+<<3.0.0 可能有效（多年未测试）
+<=2.6.27 绝对不会工作
+分布
+v4l2loopack 现在（自 2010 年 10 月 13 日起）作为 Debian 软件包提供。 https://packages.debian.org/source/stable/v4l2loopback
+
+这意味着，它也是 Debian 衍生发行版的一部分，包括 Ubuntu（从 natty 开始）。最方便的方法是安装包“v4l2loopback-dkms”：
+
+# aptitude install v4l2loopback-dkms
+这应该会自动为您当前的内核构建和安装模块（前提是您安装了匹配的内核头文件）。另一种选择是安装“v4l2loopback-source”包。在这种情况下，您应该能够简单地（以 root 身份）执行以下操作：
+
+# aptitude install v4l2loopback-source module-assistant
+# module-assistant auto-install v4l2loopback-source
+数据管理系统
+的动态内核模块支持框架（DKMS）被设计为允许在不改变整个内核被升级单个内核模块。在升级内核时重建模块也很容易。
+
+如果您的发行版不提供v4l2loopback-packages（或者它们太旧）并且您在代码签名方面遇到问题，您可能应该尝试这个。
+
+例如，要构建 v4l2loopback-v0.12.5（但请先查看网页以获取较新版本！），请使用以下内容（您可能需要以dkms超级用户/root 用户身份运行命令）：
+
+version=0.12.5
+# download and extract the tarball (tar requires superuser privileges)
+curl -L https://github.com/umlaeute/v4l2loopback/archive/v${version}.tar.gz | tar xvz -C /usr/src
+# build and install the DKMS-module (requires superuser privileges)
+dkms add -m v4l2loopback -v ${version}
+dkms build -m v4l2loopback -v ${version}
+dkms install -m v4l2loopback -v ${version}
+分配	依赖
+费多拉，...	gcc 内核开发 dkms
+Debian、Ubuntu、...	公里数
+在启动时加载模块
+可以通过让 systemd 在启动时加载模块来避免手动加载模块，方法是创建一个/etc/modules-load.d/v4l2loopback.conf仅包含模块名称的文件：
+
+v4l2loopback
+这在v4l2loopback与 DKMS 或 Linux 发行版提供的软件包一起安装时特别方便。
+
+如果需要，可以通过/etc/modprobe.d/v4l2loopback.conf以以下形式创建来指定默认模块选项 ：
+
+options v4l2loopback video_nr=3,4,7
+options v4l2loopback card_label="device number 3,the number four,the last one"
+每行只能添加一个选项。这些选项也成为手动调用时的默认值modprobe v4l2loopback。请注意，双引号只能在选项值的开头和结尾使用，而不是在命令行中指定时使用。
+
+如果您的系统使用初始 ramdisk 启动，这是大多数现代发行版的情况，您需要使用上述设置更新此 ramdisk，然后它们才能在启动时生效。在 Ubuntu 中，此映像更新为 sudo update-initramfs. Fedora 上的等价物是sudo dracut -f.
+
+下载
+该模块的最新版本可以在http://github.com/umlaeute/v4l2loopback/找到 。
+
+许可/复制
+版权所有 (c) 2010-2021 IOhannes m zmoelnig
+
+版权所有 (c) 2016 Gavin Qiu
+
+版权所有 (c) 2016 乔治·克里斯
+
+版权所有 (c) 2014-2015 Tasos Sahanidis
+
+版权所有 (c) 2012-2015 Yusuke Ohshima
+
+版权所有 (c) 2015 Kurt Kiefer
+
+版权所有 (c) 2015 Michel Promonet
+
+版权所有 (c) 2015 保罗布鲁克
+
+版权所有 (c) 2015 汤姆·泽鲁查 (Tom Zerucha)
+
+版权所有 (c) 2013 艾丹桑顿
+
+版权所有 (c) 2013 Anatolij Gustschin
+
+版权所有 (c) 2012 Ted Mielczarek
+
+版权所有 (c) 2012 安东诺维科夫
+
+版权所有 (c) 2011 Stefan Diewald
+
+版权所有 (c) 2010 Scott Maines
+
+版权所有 (c) 2009 Gorinich Zmey
+
+版权所有 (c) 2005-2009 Vasily Levin
+
+这个包是免费软件；您可以根据自由软件基金会发布的 GNU 通用公共许可证的条款重新分发和/或修改它；许可证的第 2 版，或（由您选择）任何更高版本。
+
+分发这个包是希望它有用，但没有任何保证；甚至没有对适销性或针对特定目的的适用性的暗示保证。有关更多详细信息，请参阅 GNU 通用公共许可证。
+
+您应该已经收到一份 GNU 通用公共许可证以及该程序。如果没有，请参阅http://www.gnu.org/licenses/。
